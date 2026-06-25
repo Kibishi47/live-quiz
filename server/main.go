@@ -350,6 +350,38 @@ func handleHost(room *Room, conn *websocket.Conn) {
 				}
 				room.BroadcastState()
 
+			case "EDIT_QUESTION":
+				targetQID, _ := cmd["questionId"].(string)
+				text, _ := cmd["text"].(string)
+				optsRaw, ok := cmd["options"].([]interface{})
+				log.Printf("[EDIT_QUESTION] Payload: id=%s, text=%s, ok=%t", targetQID, text, ok)
+				if !ok || text == "" || targetQID == "" {
+					continue
+				}
+				options := make([]string, len(optsRaw))
+				for i, v := range optsRaw {
+					options[i] = fmt.Sprintf("%v", v)
+				}
+				
+				foundIdx := -1
+				for i, q := range room.Questions {
+					if q.ID == targetQID {
+						foundIdx = i
+						break
+					}
+				}
+				log.Printf("[EDIT_QUESTION] Found index: %d", foundIdx)
+				if foundIdx >= 0 {
+					if room.Questions[foundIdx].CorrectIndex == nil {
+						room.Questions[foundIdx].Text = text
+						room.Questions[foundIdx].Options = options
+						log.Printf("[EDIT_QUESTION] Updated question %s successfully", targetQID)
+						room.BroadcastState()
+					} else {
+						log.Printf("[EDIT_QUESTION] Question %s is already validated, skipping edit", targetQID)
+					}
+				}
+
 			case "PREPARE_NEXT_QUESTION":
 				room.Phase = "creating_question"
 				room.BroadcastState()

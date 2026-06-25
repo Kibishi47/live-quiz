@@ -192,7 +192,16 @@
                 + Ajouter une option
               </button>
               <button class="btn btn-primary" :disabled="!isValidQuestion" @click="submitNewQuestion">
-                Ajouter la question
+                {{ editingQuestionId ? 'Modifier la question' : 'Ajouter la question' }}
+              </button>
+              <button 
+                v-if="editingQuestionId" 
+                type="button" 
+                class="btn btn-secondary" 
+                @click="cancelEdit"
+                style="margin-left: 0.5rem;"
+              >
+                Annuler la modification
               </button>
             </div>
           </div>
@@ -216,6 +225,15 @@
                     style="padding: 0.35rem 0.6rem; font-size: 0.8rem; line-height: 1;"
                   >
                     ▶️ Lancer
+                  </button>
+                  <button 
+                    v-if="q.correctIndex === null" 
+                    class="btn btn-secondary btn-sm" 
+                    @click="startEditQuestion(q)"
+                    title="Modifier la question"
+                    style="padding: 0.35rem 0.6rem; font-size: 0.8rem; line-height: 1; background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2);"
+                  >
+                    ✏️
                   </button>
                   <button 
                     v-if="q.correctIndex === null" 
@@ -512,6 +530,7 @@ const {
   hostNickname,
   initHost,
   addQuestion,
+  editQuestion,
   prepareNextQuestion,
   launchVoting,
   closeVoting,
@@ -543,6 +562,7 @@ const phaseLabels = {
 // Question Creator States
 const newQText = ref('')
 const newQOptions = ref(['', '', '', ''])
+const editingQuestionId = ref(null)
 
 const isValidQuestion = computed(() => {
   if (!newQText.value.trim()) return false
@@ -562,11 +582,36 @@ const removeOption = (index) => {
   }
 }
 
+const startEditQuestion = (q) => {
+  newQText.value = q.text
+  const opts = [...q.options]
+  while (opts.length < 4) {
+    opts.push('')
+  }
+  newQOptions.value = opts
+  editingQuestionId.value = q.id
+  
+  // Smooth scroll to the form
+  const creatorSection = document.querySelector('.creator-section')
+  creatorSection?.scrollIntoView({ behavior: 'smooth' })
+}
+
+const cancelEdit = () => {
+  editingQuestionId.value = null
+  newQText.value = ''
+  newQOptions.value = ['', '', '', '']
+}
+
 const submitNewQuestion = () => {
   const validOpts = newQOptions.value.map(o => o.trim()).filter(o => o !== '')
   if (!newQText.value.trim() || validOpts.length < 2) return
   
-  addQuestion(newQText.value.trim(), validOpts)
+  if (editingQuestionId.value) {
+    editQuestion(editingQuestionId.value, newQText.value.trim(), validOpts)
+    editingQuestionId.value = null
+  } else {
+    addQuestion(newQText.value.trim(), validOpts)
+  }
   
   // Reset fields
   newQText.value = ''

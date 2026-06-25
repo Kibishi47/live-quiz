@@ -222,6 +222,17 @@ export function useQuizHost() {
     }
   }
 
+  const editQuestion = (questionId: string, text: string, options: string[]) => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        type: 'EDIT_QUESTION',
+        questionId,
+        text,
+        options
+      }))
+    }
+  }
+
   const restartQuiz = () => {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({
@@ -249,6 +260,7 @@ export function useQuizHost() {
     hostNickname,
     initHost,
     addQuestion,
+    editQuestion,
     prepareNextQuestion,
     launchVoting,
     closeVoting,
