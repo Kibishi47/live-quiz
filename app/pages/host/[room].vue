@@ -139,15 +139,36 @@
             </div>
 
             <div class="options-grid">
-              <div v-for="idx in 8" :key="idx" class="form-group opt-item">
+              <div v-for="idx in newQOptions.length" :key="idx" class="form-group opt-item">
                 <label>Option {{ idx }}</label>
-                <input v-model="newQOptions[idx - 1]" type="text" :placeholder="'Option ' + idx + (idx > 2 ? ' (Optionnelle)' : '')" class="input-text" />
+                <div class="option-input-wrapper">
+                  <input v-model="newQOptions[idx - 1]" type="text" :placeholder="'Option ' + idx + (idx > 2 ? ' (Optionnelle)' : '')" class="input-text" />
+                  <button 
+                    v-if="newQOptions.length > 2" 
+                    type="button" 
+                    class="btn-remove-option" 
+                    @click="removeOption(idx - 1)"
+                    title="Retirer l'option"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             </div>
 
-            <button class="btn btn-primary mt-2" :disabled="!isValidQuestion" @click="submitNewQuestion">
-              Ajouter la question
-            </button>
+            <div class="creator-actions mt-4">
+              <button 
+                v-if="newQOptions.length < 8"
+                type="button" 
+                class="btn btn-secondary btn-sm" 
+                @click="addOptionField"
+              >
+                + Ajouter une option
+              </button>
+              <button class="btn btn-primary" :disabled="!isValidQuestion" @click="submitNewQuestion">
+                Ajouter la question
+              </button>
+            </div>
           </div>
 
           <div class="questions-list mt-4" v-if="questions.length > 0">
@@ -301,13 +322,25 @@ const phaseLabels = {
 
 // Question Creator States
 const newQText = ref('')
-const newQOptions = ref(['', '', '', '', '', '', '', ''])
+const newQOptions = ref(['', '', '', ''])
 
 const isValidQuestion = computed(() => {
   if (!newQText.value.trim()) return false
   const validOpts = newQOptions.value.map(o => o.trim()).filter(o => o !== '')
   return validOpts.length >= 2
 })
+
+const addOptionField = () => {
+  if (newQOptions.value.length < 8) {
+    newQOptions.value.push('')
+  }
+}
+
+const removeOption = (index) => {
+  if (newQOptions.value.length > 2) {
+    newQOptions.value.splice(index, 1)
+  }
+}
 
 const submitNewQuestion = () => {
   const validOpts = newQOptions.value.map(o => o.trim()).filter(o => o !== '')
@@ -317,7 +350,7 @@ const submitNewQuestion = () => {
   
   // Reset fields
   newQText.value = ''
-  newQOptions.value = ['', '', '', '', '', '', '', '']
+  newQOptions.value = ['', '', '', '']
 }
 
 // Share mechanism
@@ -774,9 +807,16 @@ onMounted(() => {
   border-color: var(--color-secondary);
 }
 
+.arena-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .badge-player {
   background: var(--color-secondary);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .arena-options {
@@ -872,4 +912,42 @@ onMounted(() => {
 
 .mt-4 { margin-top: 1rem; }
 .mt-2 { margin-top: 0.5rem; }
+
+.option-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.option-input-wrapper .input-text {
+  padding-right: 2.25rem;
+}
+
+.btn-remove-option {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: var(--transition-smooth);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-remove-option:hover {
+  opacity: 1;
+  color: var(--color-danger);
+}
+
+.creator-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

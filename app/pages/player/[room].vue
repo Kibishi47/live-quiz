@@ -540,6 +540,7 @@ const sortedPlayers = computed(() => {
   cursor: pointer;
   width: 100%;
   transition: var(--transition-smooth);
+  color: var(--text-primary);
 }
 
 .option-card:hover {
