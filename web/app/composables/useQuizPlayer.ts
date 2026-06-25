@@ -15,13 +15,31 @@ export function useQuizPlayer() {
     error.value = ''
     
     try {
-      const loc = window.location
-      let wsHost = loc.host
-      if (wsHost.includes('localhost:') || wsHost.includes('127.0.0.1:')) {
-        wsHost = 'localhost:8080'
+      const config = useRuntimeConfig()
+      let baseWsUrl = config.public.wsUrl
+      if (baseWsUrl) {
+        if (baseWsUrl.startsWith('https://')) {
+          baseWsUrl = 'wss://' + baseWsUrl.slice(8)
+        } else if (baseWsUrl.startsWith('http://')) {
+          baseWsUrl = 'ws://' + baseWsUrl.slice(7)
+        } else if (!baseWsUrl.startsWith('ws://') && !baseWsUrl.startsWith('wss://')) {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+          baseWsUrl = `${protocol}//${baseWsUrl}`
+        }
+        if (baseWsUrl.endsWith('/')) {
+          baseWsUrl = baseWsUrl.slice(0, -1)
+        }
+      } else {
+        const loc = window.location
+        let wsHost = loc.host
+        if (wsHost.includes('localhost:') || wsHost.includes('127.0.0.1:')) {
+          wsHost = 'localhost:8080'
+        }
+        const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:'
+        baseWsUrl = `${protocol}//${wsHost}`
       }
-      const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:'
-      const wsUrl = `${protocol}//${wsHost}/ws?room=${roomId.trim().toLowerCase()}&role=player&nickname=${encodeURIComponent(nickname)}`
+
+      const wsUrl = `${baseWsUrl}/ws?room=${roomId.trim().toLowerCase()}&role=player&nickname=${encodeURIComponent(nickname)}`
 
       ws.value = new WebSocket(wsUrl)
 
