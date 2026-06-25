@@ -145,7 +145,19 @@
 
         <!-- Question Creator (Shown in Lobby or Creating Question phases) -->
         <section v-if="phase === 'lobby' || phase === 'creating_question'" class="glass-panel creator-section mt-4 animate-fade-in">
-          <h2>➕ Créer une Question</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">➕ Créer une Question</h2>
+            <div style="display: flex; gap: 0.5rem;">
+              <button 
+                class="btn btn-secondary btn-sm" 
+                style="padding: 0.35rem 0.6rem; font-size: 0.8rem; opacity: 0.85;"
+                @click="openManageModal"
+                title="Gérer les questionnaires"
+              >
+                📂 Questionnaires
+              </button>
+            </div>
+          </div>
           <div class="creator-form">
             <div class="form-group">
               <label>Intitulé de la question</label>
@@ -323,6 +335,159 @@
         </div>
       </aside>
     </div>
+
+    <!-- MODAL: MANAGE QUESTIONNAIRES -->
+    <div v-if="showManageModal" class="modal-overlay animate-fade-in" @click.self="showManageModal = false">
+      <div class="glass-panel modal-card large">
+        <div class="modal-header">
+          <h2>📂 Gestion des questionnaires</h2>
+          <button class="btn-close" @click="showManageModal = false">×</button>
+        </div>
+        
+        <div class="modal-body unified-grid">
+          <!-- Save Current Section -->
+          <div class="modal-section save-section">
+            <h3>💾 Enregistrer le questionnaire actuel</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Enregistrez les {{ questions.length }} questions de ce salon pour pouvoir les réutiliser plus tard.
+            </p>
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left; width: 100%;">
+              <label for="save-name" style="font-size: 0.85rem; color: var(--text-muted);">Nom du questionnaire</label>
+              <input 
+                id="save-name" 
+                v-model="saveNameInput" 
+                type="text" 
+                placeholder="Ex: Quiz de culture générale..." 
+                class="input-text"
+                :disabled="questions.length === 0"
+                @keyup.enter="confirmSaveQuestionnaire"
+              />
+              <button 
+                class="btn btn-primary mt-3" 
+                :disabled="!saveNameInput.trim() || questions.length === 0" 
+                @click="confirmSaveQuestionnaire"
+              >
+                Sauvegarder dans la liste
+              </button>
+              <p v-if="questions.length === 0" class="warning-text mt-2" style="font-size: 0.8rem; text-align: center;">
+                Ajoutez des questions pour pouvoir sauvegarder ce questionnaire.
+              </p>
+            </div>
+          </div>
+
+          <!-- Saved List Section -->
+          <div class="modal-section list-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h3 style="margin: 0;">📋 Questionnaires enregistrés</h3>
+              <div>
+                <button 
+                  class="btn btn-secondary btn-sm" 
+                  style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
+                  @click="triggerFileInput"
+                >
+                  📥 Importer .json
+                </button>
+                <input 
+                  id="import-file-input" 
+                  type="file" 
+                  accept=".json" 
+                  style="display: none;" 
+                  @change="handleFileImport"
+                />
+              </div>
+            </div>
+
+            <div v-if="Object.keys(savedQuestionnaires).length === 0" class="no-saved" style="padding: 2rem 0; text-align: center;">
+              <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">Aucun questionnaire enregistré dans ce navigateur.</p>
+            </div>
+            <div v-else class="saved-list" style="max-height: 240px; overflow-y: auto;">
+              <div 
+                v-for="(qs, name) in savedQuestionnaires" 
+                :key="name" 
+                class="saved-item"
+                style="margin-bottom: 0.5rem;"
+              >
+                <div class="saved-item-info" @click="confirmLoadQuestionnaire(name)" title="Charger ce questionnaire dans le salon" style="cursor: pointer; flex: 1;">
+                  <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600;">{{ name }}</h4>
+                  <p style="margin: 0 0 0.15rem 0; font-size: 0.75rem; color: var(--text-muted);">{{ qs.length }} question(s)</p>
+                </div>
+                <div style="display: flex; gap: 0.25rem;">
+                  <button 
+                    class="btn-delete-saved" 
+                    @click="exportQuestionnaireFile(name)"
+                    title="Exporter ce questionnaire en JSON"
+                  >
+                    📤
+                  </button>
+                  <button 
+                    class="btn-delete-saved" 
+                    @click="deleteSavedQuestionnaire(name)"
+                    title="Supprimer ce questionnaire"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer mt-4">
+          <button class="btn btn-secondary" @click="showManageModal = false">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: CONFIRM DELETE -->
+    <div v-if="questionnaireToDelete" class="modal-overlay animate-fade-in" style="z-index: 1100;" @click.self="questionnaireToDelete = null">
+      <div class="glass-panel modal-card">
+        <div class="modal-header">
+          <h2>🗑️ Supprimer le questionnaire</h2>
+          <button class="btn-close" @click="questionnaireToDelete = null">×</button>
+        </div>
+        <div class="modal-body text-center">
+          <p>Voulez-vous vraiment supprimer le questionnaire <strong>"{{ questionnaireToDelete }}"</strong> ?</p>
+          <p class="warning-text mt-2" style="font-size: 0.9rem; color: var(--text-muted);">Cette action est définitive.</p>
+        </div>
+        <div class="modal-footer mt-4">
+          <button class="btn btn-secondary" @click="questionnaireToDelete = null">Annuler</button>
+          <button class="btn btn-danger" @click="confirmDeleteQuestionnaire">Supprimer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: IMPORT CONFIGURATION -->
+    <div v-if="showImportModal" class="modal-overlay animate-fade-in" style="z-index: 1100;" @click.self="showImportModal = false">
+      <div class="glass-panel modal-card">
+        <div class="modal-header">
+          <h2>📥 Importer un questionnaire</h2>
+          <button class="btn-close" @click="showImportModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="importError" class="alert-error mt-2 mb-4" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem; border-radius: 6px; color: #ef4444; font-size: 0.9rem; text-align: left;">
+            ⚠️ {{ importError }}
+          </div>
+          <div v-else>
+            <p>Le fichier contient <strong>{{ importedData?.length }}</strong> question(s).</p>
+            <div class="form-group mt-4" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left; width: 100%;">
+              <label for="import-name" style="font-size: 0.9rem; color: var(--text-muted);">Nom du questionnaire importé</label>
+              <input 
+                id="import-name" 
+                v-model="importNameInput" 
+                type="text" 
+                placeholder="Nom du questionnaire..." 
+                class="input-text"
+                @keyup.enter="confirmImportQuestionnaire"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer mt-4">
+          <button class="btn btn-secondary" @click="showImportModal = false">Annuler</button>
+          <button class="btn btn-primary" :disabled="!importNameInput.trim() || !!importError" @click="confirmImportQuestionnaire">Importer</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -406,6 +571,139 @@ const submitNewQuestion = () => {
   // Reset fields
   newQText.value = ''
   newQOptions.value = ['', '', '', '']
+}
+
+// Modal states for import/export
+const showManageModal = ref(false)
+const saveNameInput = ref('')
+const savedQuestionnaires = ref({})
+
+const questionnaireToDelete = ref(null)
+const showImportModal = ref(false)
+const importNameInput = ref('')
+const importedData = ref(null)
+const importError = ref('')
+
+const openManageModal = () => {
+  if (!process.client) return
+  saveNameInput.value = ''
+  try {
+    const saved = localStorage.getItem("live-quiz-questionnaires")
+    savedQuestionnaires.value = saved ? JSON.parse(saved) : {}
+  } catch (e) {
+    console.error(e)
+    savedQuestionnaires.value = {}
+  }
+  showManageModal.value = true
+}
+
+const confirmSaveQuestionnaire = () => {
+  const name = saveNameInput.value.trim()
+  if (!name || questions.value.length === 0) return
+  try {
+    const saved = localStorage.getItem("live-quiz-questionnaires")
+    const questionnaires = saved ? JSON.parse(saved) : {}
+    questionnaires[name] = questions.value.map(q => ({
+      text: q.text,
+      options: q.options
+    }))
+    localStorage.setItem("live-quiz-questionnaires", JSON.stringify(questionnaires))
+    savedQuestionnaires.value = questionnaires
+    saveNameInput.value = ''
+  } catch (err) {
+    console.error("Error saving questionnaire:", err)
+  }
+}
+
+const confirmLoadQuestionnaire = (name) => {
+  const loadedQuestions = savedQuestionnaires.value[name]
+  if (loadedQuestions && Array.isArray(loadedQuestions)) {
+    for (const q of loadedQuestions) {
+      addQuestion(q.text, q.options)
+    }
+    showManageModal.value = false
+  }
+}
+
+const deleteSavedQuestionnaire = (name) => {
+  questionnaireToDelete.value = name
+}
+
+const confirmDeleteQuestionnaire = () => {
+  const name = questionnaireToDelete.value
+  if (!name) return
+  try {
+    delete savedQuestionnaires.value[name]
+    localStorage.setItem("live-quiz-questionnaires", JSON.stringify(savedQuestionnaires.value))
+    questionnaireToDelete.value = null
+  } catch (err) {
+    console.error("Error deleting questionnaire:", err)
+  }
+}
+
+const exportQuestionnaireFile = (name) => {
+  const qs = savedQuestionnaires.value[name]
+  if (!qs) return
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(qs, null, 2))
+  const downloadAnchor = document.createElement('a')
+  downloadAnchor.setAttribute("href", dataStr)
+  downloadAnchor.setAttribute("download", `${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.json`)
+  document.body.appendChild(downloadAnchor)
+  downloadAnchor.click()
+  downloadAnchor.remove()
+}
+
+const triggerFileInput = () => {
+  const fileInput = document.getElementById('import-file-input')
+  fileInput?.click()
+}
+
+const handleFileImport = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result)
+      if (!Array.isArray(data) || data.some(q => !q.text || !Array.isArray(q.options))) {
+        importError.value = "Format de fichier invalide. Il doit s'agir d'un tableau JSON contenant des questions."
+        importedData.value = null
+      } else {
+        importError.value = ""
+        importedData.value = data
+      }
+      
+      importNameInput.value = file.name.replace(/\.json$/i, '')
+      showImportModal.value = true
+    } catch (err) {
+      console.error(err)
+      importError.value = "Erreur lors de la lecture du fichier JSON."
+      importedData.value = null
+      importNameInput.value = ""
+      showImportModal.value = true
+    }
+  }
+  reader.readAsText(file)
+  event.target.value = ''
+}
+
+const confirmImportQuestionnaire = () => {
+  const name = importNameInput.value.trim()
+  if (!name || !importedData.value) return
+  
+  try {
+    savedQuestionnaires.value[name] = importedData.value.map(q => ({
+      text: q.text,
+      options: q.options
+    }))
+    localStorage.setItem("live-quiz-questionnaires", JSON.stringify(savedQuestionnaires.value))
+    showImportModal.value = false
+    importedData.value = null
+    importNameInput.value = ""
+  } catch (err) {
+    console.error("Error importing questionnaire:", err)
+  }
 }
 
 // Share mechanism
@@ -1041,6 +1339,161 @@ onMounted(() => {
 }
 
 .btn-kick:hover {
+  opacity: 1;
+}
+
+/* Modals styling */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 500px;
+  padding: 2rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.modal-card.large {
+  max-width: 800px;
+}
+
+.unified-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .unified-grid {
+    grid-template-columns: 1fr 1.2fr;
+    align-items: start;
+  }
+  
+  .save-section {
+    border-right: 1px solid var(--glass-border);
+    padding-right: 2rem;
+  }
+}
+
+.modal-section h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 1rem;
+}
+
+.modal-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 2rem;
+  cursor: pointer;
+  line-height: 0.5;
+  transition: color var(--transition-smooth);
+}
+
+.btn-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 1rem;
+}
+
+.no-saved {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+}
+
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.saved-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  transition: transform var(--transition-smooth), background var(--transition-smooth);
+}
+
+.saved-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+}
+
+.saved-item-info {
+  flex: 1;
+  cursor: pointer;
+}
+
+.saved-item-info h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.saved-item-info p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.btn-delete-saved {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  font-size: 1.1rem;
+  opacity: 0.5;
+  transition: opacity var(--transition-smooth);
+}
+
+.btn-delete-saved:hover {
   opacity: 1;
 }
 </style>
