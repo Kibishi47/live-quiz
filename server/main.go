@@ -46,6 +46,12 @@ type PlayerQuestion struct {
 	Options []string `json:"options"`
 }
 
+type ChatMessage struct {
+	Sender    string `json:"sender"`
+	Text      string `json:"text"`
+	Timestamp int64  `json:"timestamp"`
+}
+
 type GameState struct {
 	RoomID             string          `json:"roomId"`
 	Phase              string          `json:"phase"`
@@ -53,6 +59,7 @@ type GameState struct {
 	CurrentQuestion    *PlayerQuestion `json:"currentQuestion"`
 	RevealAnswers      bool            `json:"revealAnswers"`
 	CorrectOptionIndex *int            `json:"correctOptionIndex"`
+	Chat               []ChatMessage   `json:"chat"`
 }
 
 type PlayerConn struct {
@@ -71,6 +78,7 @@ type Room struct {
 	PlayersData          map[string]*Player     `json:"players"`
 	PlayersMu            sync.RWMutex           `json:"-"`
 	Questions            []Question             `json:"-"`
+	Chat                 []ChatMessage          `json:"-"`
 	CurrentQuestionIndex int                    `json:"currentQuestionIndex"`
 	IsHostPlaying        bool                   `json:"isHostPlaying"`
 	HostNickname         string                 `json:"hostNickname"`
@@ -84,6 +92,7 @@ func NewRoom(id string) *Room {
 		Players:              make(map[string]*PlayerConn),
 		PlayersData:          make(map[string]*Player),
 		Questions:            make([]Question, 0),
+		Chat:                 make([]ChatMessage, 0),
 		CurrentQuestionIndex: -1,
 		LastActive:           time.Now(),
 	}
@@ -141,6 +150,7 @@ func (r *Room) BroadcastState() {
 		CurrentQuestion:    currentQ,
 		RevealAnswers:      r.Phase == "revealed",
 		CorrectOptionIndex: correctIdx,
+		Chat:               r.Chat,
 	}
 
 	payloadPlayer, err := json.Marshal(map[string]interface{}{
@@ -162,6 +172,7 @@ func (r *Room) BroadcastState() {
 			"revealAnswers":      r.Phase == "revealed",
 			"correctOptionIndex": correctIdx,
 			"questions":          r.Questions,
+			"chat":               r.Chat,
 		},
 	})
 	if err != nil {
@@ -572,6 +583,24 @@ func handleHost(room *Room, conn *websocket.Conn) {
 					p.JoinQuestionIndex = 0
 				}
 				room.BroadcastState()
+
+			case "SEND_CHAT_MESSAGE":
+				text, _ := cmd["text"].(string)
+				if text == "" {
+					continue
+				}
+				msg := ChatMessage{
+					Sender:    "Hôte",
+					Text:      text,
+					Timestamp: time.Now().Unix(),
+				}
+				room.PlayersMu.Lock()
+				room.Chat = append(room.Chat, msg)
+				if len(room.Chat) > 50 {
+					room.Chat = room.Chat[len(room.Chat)-50:]
+				}
+				room.PlayersMu.Unlock()
+				room.BroadcastState()
 			}
 		}
 	}
@@ -671,6 +700,24 @@ func handlePlayer(room *Room, conn *websocket.Conn, nickname string) {
 				}
 				room.PlayersMu.Unlock()
 				room.BroadcastState()
+			}
+
+			if cmdType == "SEND_CHAT_MESSAGE" {
+				text, _ := cmd["text"].(string)
+				if text != "" {
+					msg := ChatMessage{
+						Sender:    nickname,
+						Text:      text,
+						Timestamp: time.Now().Unix(),
+					}
+					room.PlayersMu.Lock()
+					room.Chat = append(room.Chat, msg)
+					if len(room.Chat) > 50 {
+						room.Chat = room.Chat[len(room.Chat)-50:]
+					}
+					room.PlayersMu.Unlock()
+					room.BroadcastState()
+				}
 			}
 		}
 	}

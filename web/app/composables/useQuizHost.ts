@@ -20,6 +20,12 @@ export interface Question {
   correctIndex: number | null
 }
 
+export interface ChatMessage {
+  sender: string
+  text: string
+  timestamp: number
+}
+
 export interface GameState {
   roomId: string
   phase: 'lobby' | 'creating_question' | 'voting' | 'selecting_answer' | 'revealed' | 'ended'
@@ -32,6 +38,7 @@ export interface GameState {
   revealAnswers: boolean
   correctOptionIndex: number | null
   questions?: Question[]
+  chat?: ChatMessage[]
 }
 
 export function useQuizHost() {
@@ -41,6 +48,7 @@ export function useQuizHost() {
   const phase = ref<'lobby' | 'creating_question' | 'voting' | 'selecting_answer' | 'revealed' | 'ended'>('lobby')
   const players = ref<Player[]>([])
   const questions = ref<Question[]>([])
+  const chat = ref<ChatMessage[]>([])
   const currentQuestion = ref<{ id: string; text: string; options: string[] } | null>(null)
   const currentQuestionIndex = ref(-1)
   const isPeerReady = ref(false)
@@ -102,6 +110,7 @@ export function useQuizHost() {
             phase.value = state.phase
             players.value = state.players || []
             questions.value = state.questions || []
+            chat.value = state.chat || []
             currentQuestion.value = state.currentQuestion || null
             currentQuestionIndex.value = state.currentQuestionIndex ?? -1
           }
@@ -233,6 +242,15 @@ export function useQuizHost() {
     }
   }
 
+  const sendChatMessage = (text: string) => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        type: 'SEND_CHAT_MESSAGE',
+        text
+      }))
+    }
+  }
+
   const restartQuiz = () => {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({
@@ -252,6 +270,7 @@ export function useQuizHost() {
     phase,
     players,
     questions,
+    chat,
     currentQuestion,
     currentQuestionIndex,
     isPeerReady,
@@ -271,6 +290,7 @@ export function useQuizHost() {
     kickPlayer,
     leaveRoom,
     deleteQuestion,
-    restartQuiz
+    restartQuiz,
+    sendChatMessage
   }
 }

@@ -506,11 +506,61 @@
         </div>
       </div>
     </div>
+
+    <!-- CHAT DRAWER TOGGLE BUTTON -->
+    <button 
+      class="btn-chat-toggle" 
+      @click="toggleChatDrawer"
+      title="Ouvrir le chat"
+    >
+      💬
+      <span v-if="unreadChatCount > 0" class="chat-badge">{{ unreadChatCount }}</span>
+    </button>
+
+    <!-- CHAT DRAWER -->
+    <div class="chat-drawer" :class="{ 'open': showChatDrawer }">
+      <div class="chat-header">
+        <h3>💬 Discussion</h3>
+        <button class="btn-close-chat" @click="showChatDrawer = false">×</button>
+      </div>
+      <div class="chat-messages" ref="chatScrollContainer">
+        <div v-if="chat.length === 0" class="no-messages">
+          Aucun message. Envoyez le premier message !
+        </div>
+        <div 
+          v-else 
+          v-for="(msg, idx) in chat" 
+          :key="idx" 
+          class="chat-bubble-wrapper"
+          :class="{ 'is-me': msg.sender === 'Hôte', 'is-host': msg.sender === 'Hôte' }"
+        >
+          <div class="chat-bubble-meta">
+            <span class="chat-bubble-sender">{{ msg.sender }}</span>
+            <span class="chat-bubble-time">{{ formatTime(msg.timestamp) }}</span>
+          </div>
+          <div class="chat-bubble">
+            {{ msg.text }}
+          </div>
+        </div>
+      </div>
+      <div class="chat-footer">
+        <input 
+          v-model="chatInput" 
+          type="text" 
+          placeholder="Écrire un message..." 
+          class="input-text chat-input" 
+          @keyup.enter="sendChatMessageLocal"
+        />
+        <button class="btn btn-primary btn-send-chat" :disabled="!chatInput.trim()" @click="sendChatMessageLocal">
+          ➤
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuizHost } from '~/composables/useQuizHost'
 
@@ -522,6 +572,7 @@ const {
   phase,
   players,
   questions,
+  chat,
   currentQuestion,
   currentQuestionIndex,
   isPeerReady,
@@ -541,8 +592,57 @@ const {
   kickPlayer,
   leaveRoom,
   deleteQuestion,
-  restartQuiz
+  restartQuiz,
+  sendChatMessage
 } = useQuizHost()
+
+const showChatDrawer = ref(false)
+const chatInput = ref('')
+const unreadChatCount = ref(0)
+const chatScrollContainer = ref(null)
+
+const toggleChatDrawer = () => {
+  showChatDrawer.value = !showChatDrawer.value
+  if (showChatDrawer.value) {
+    unreadChatCount.value = 0
+    scrollToBottom()
+  }
+}
+
+const sendChatMessageLocal = () => {
+  const text = chatInput.value.trim()
+  if (!text) return
+  sendChatMessage(text)
+  chatInput.value = ''
+  scrollToBottom()
+}
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatScrollContainer.value) {
+      chatScrollContainer.value.scrollTop = chatScrollContainer.value.scrollHeight
+    }
+  })
+}
+
+// Watch chat array updates to handle unread count and auto-scroll
+watch(chat, (newChat, oldChat) => {
+  if (!showChatDrawer.value) {
+    const diff = newChat.length - (oldChat?.length || 0)
+    if (diff > 0) {
+      unreadChatCount.value += diff
+    }
+  } else {
+    scrollToBottom()
+  }
+}, { deep: true })
+
+const formatTime = (ts) => {
+  const date = new Date(ts * 1000)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
 
 const handleLeave = () => {
   leaveRoom()
@@ -1540,5 +1640,172 @@ onMounted(() => {
 
 .btn-delete-saved:hover {
   opacity: 1;
+}
+
+/* Chat drawer styles */
+.btn-chat-toggle {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--btn-primary-bg, #6366f1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  font-size: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 999;
+  transition: transform 0.2s, background 0.2s;
+}
+.btn-chat-toggle:hover {
+  transform: scale(1.05);
+  background: #4f46e5;
+}
+.chat-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 50%;
+  padding: 0.2rem 0.5rem;
+  line-height: 1;
+}
+
+.chat-drawer {
+  position: fixed;
+  top: 0;
+  right: -360px;
+  width: 360px;
+  height: 100%;
+  background: rgba(15, 15, 20, 0.9);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 480px) {
+  .chat-drawer {
+    width: 100%;
+    right: -100%;
+  }
+}
+.chat-drawer.open {
+  right: 0;
+}
+
+.chat-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.chat-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.btn-close-chat {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.8rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.btn-close-chat:hover {
+  color: var(--text-primary);
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.no-messages {
+  text-align: center;
+  color: var(--text-muted);
+  margin-top: 2rem;
+  font-size: 0.9rem;
+}
+
+.chat-bubble-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 85%;
+}
+.chat-bubble-wrapper.is-me {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-bubble-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.2rem;
+  color: var(--text-muted);
+}
+.chat-bubble-sender {
+  font-weight: 600;
+}
+.chat-bubble-wrapper.is-host .chat-bubble-sender {
+  color: #fbbf24;
+}
+
+.chat-bubble {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  border-top-left-radius: 2px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.chat-bubble-wrapper.is-me .chat-bubble {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.3);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 2px;
+}
+
+.chat-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+.chat-input {
+  flex: 1;
+  border-radius: 20px !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.9rem !important;
+}
+.btn-send-chat {
+  border-radius: 50% !important;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 !important;
+  font-size: 1rem !important;
 }
 </style>

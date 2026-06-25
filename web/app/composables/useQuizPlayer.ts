@@ -99,6 +99,15 @@ export function useQuizPlayer() {
     disconnect()
   }
 
+  const sendChatMessage = (text: string) => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        type: 'SEND_CHAT_MESSAGE',
+        text
+      }))
+    }
+  }
+
   const disconnect = () => {
     if (ws.value) {
       ws.value.close()
@@ -119,6 +128,7 @@ export function useQuizPlayer() {
     joinRoom,
     submitAnswer,
     leaveRoom,
-    disconnect
+    disconnect,
+    sendChatMessage
   }
 }
