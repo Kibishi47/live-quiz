@@ -1,7 +1,34 @@
 <template>
   <div class="player-layout">
+    <!-- Nickname Prompt State -->
+    <div v-if="!nickname" class="setup-container animate-fade-in">
+      <div class="glass-panel status-card">
+        <h2>🎮 Rejoindre le salon {{ roomId }}</h2>
+        <p>Entrez votre pseudo pour participer à la partie.</p>
+        
+        <div class="form-group w-full" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left; width: 100%;">
+          <label for="prompt-nick" style="font-size: 0.9rem; color: var(--text-muted);">Pseudo</label>
+          <input 
+            id="prompt-nick" 
+            v-model="inputNickname" 
+            type="text" 
+            placeholder="Ton pseudo de compétiteur" 
+            class="input-text"
+            @keyup.enter="submitNickname"
+          />
+        </div>
+
+        <button class="btn btn-primary w-full mt-4" :disabled="!inputNickname.trim()" @click="submitNickname">
+          Rejoindre le salon
+        </button>
+        <button class="btn btn-secondary w-full mt-2" @click="goHome">
+          Retour à l'accueil
+        </button>
+      </div>
+    </div>
+
     <!-- Connecting / Error States -->
-    <div v-if="isConnecting" class="setup-container animate-fade-in">
+    <div v-else-if="isConnecting" class="setup-container animate-fade-in">
       <div class="glass-panel status-card">
         <div class="spinner"></div>
         <h2>Connexion au salon...</h2>
@@ -251,6 +278,15 @@ const handleLeave = () => {
 
 const roomId = ref('')
 const nickname = ref('')
+const inputNickname = ref('')
+
+const submitNickname = () => {
+  if (inputNickname.value.trim()) {
+    nickname.value = inputNickname.value.trim()
+    router.replace({ query: { nick: nickname.value } })
+    joinRoom(roomId.value, nickname.value)
+  }
+}
 
 const mePlayerState = computed(() => {
   return gameState.value?.players.find(p => p.nickname === nickname.value)
@@ -276,10 +312,12 @@ onMounted(() => {
   const room = route.params.room
   const nick = route.query.nick
   
-  if (room && nick) {
+  if (room) {
     roomId.value = room
-    nickname.value = nick
-    joinRoom(room, nick)
+    if (nick) {
+      nickname.value = nick
+      joinRoom(room, nick)
+    }
   } else {
     router.push('/')
   }

@@ -188,12 +188,32 @@
           <div class="questions-list mt-4" v-if="questions.length > 0">
             <h3>Questions créées ({{ questions.length }})</h3>
             <div class="questions-scroll">
-              <div v-for="(q, index) in questions" :key="q.id" class="q-item">
-                <span class="q-num">Q{{ index + 1 }}</span>
-                <div class="q-details">
-                  <p class="q-text">{{ q.text }}</p>
+              <div v-for="(q, index) in questions" :key="q.id" class="q-item" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                <div class="q-details" style="flex: 1;">
+                  <span class="q-num">Q{{ index + 1 }}</span>
+                  <p class="q-text" style="display: inline-block; margin-left: 0.5rem; font-weight: 600;">{{ q.text }}</p>
                   <p class="q-ans-hint" v-if="q.correctIndex !== null">Réponse correcte: {{ q.options[q.correctIndex] }}</p>
                   <p class="q-ans-hint pending" v-else>En attente de validation</p>
+                </div>
+                <div class="q-actions" style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+                  <button 
+                    v-if="q.correctIndex === null && (phase === 'lobby' || phase === 'creating_question' || phase === 'revealed')" 
+                    class="btn btn-success btn-sm" 
+                    @click="launchVoting(q.id)"
+                    title="Lancer cette question"
+                    style="padding: 0.35rem 0.6rem; font-size: 0.8rem; line-height: 1;"
+                  >
+                    ▶️ Lancer
+                  </button>
+                  <button 
+                    v-if="q.correctIndex === null" 
+                    class="btn btn-danger btn-sm" 
+                    @click="deleteQuestion(q.id)"
+                    title="Supprimer la question"
+                    style="padding: 0.35rem 0.6rem; font-size: 0.8rem; line-height: 1; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4);"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
             </div>
@@ -336,6 +356,7 @@ const {
   cancelQuestion,
   kickPlayer,
   leaveRoom,
+  deleteQuestion,
   restartQuiz
 } = useQuizHost()
 
@@ -409,11 +430,11 @@ const currentQuestionCorrectOption = computed(() => {
 })
 
 const isLastQuestion = computed(() => {
-  return currentQuestionIndex.value >= questions.value.length - 1
+  return !hasUnplayedQuestions.value
 })
 
 const hasUnplayedQuestions = computed(() => {
-  return currentQuestionIndex.value + 1 < questions.value.length
+  return questions.value.some(q => q.correctIndex == null)
 })
 
 const sortedPlayers = computed(() => {

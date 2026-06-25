@@ -358,14 +358,28 @@ func handleHost(room *Room, conn *websocket.Conn) {
 				if len(room.Questions) == 0 {
 					continue
 				}
-				nextIndex := room.CurrentQuestionIndex + 1
-				if nextIndex < 0 {
-					nextIndex = 0
+				targetQID, _ := cmd["questionId"].(string)
+				targetIdx := -1
+				if targetQID != "" {
+					for i, q := range room.Questions {
+						if q.ID == targetQID {
+							targetIdx = i
+							break
+						}
+					}
+				} else {
+					for i, q := range room.Questions {
+						if q.CorrectIndex == nil {
+							targetIdx = i
+							break
+						}
+					}
 				}
-				if nextIndex >= len(room.Questions) {
+
+				if targetIdx < 0 || targetIdx >= len(room.Questions) {
 					continue
 				}
-				room.CurrentQuestionIndex = nextIndex
+				room.CurrentQuestionIndex = targetIdx
 				room.Phase = "voting"
 				
 				// Reset player active answer statuses for the voting round
@@ -376,6 +390,28 @@ func handleHost(room *Room, conn *websocket.Conn) {
 				}
 				room.BroadcastState()
 
+			case "DELETE_QUESTION":
+				targetQID, _ := cmd["questionId"].(string)
+				if targetQID == "" {
+					continue
+				}
+				foundIdx := -1
+				for i, q := range room.Questions {
+					if q.ID == targetQID {
+						foundIdx = i
+						break
+					}
+				}
+				if foundIdx >= 0 {
+					if room.Questions[foundIdx].CorrectIndex == nil {
+						room.Questions = append(room.Questions[:foundIdx], room.Questions[foundIdx+1:]...)
+						if foundIdx <= room.CurrentQuestionIndex {
+							room.CurrentQuestionIndex--
+						}
+						room.BroadcastState()
+					}
+				}
+
 			case "CLOSE_VOTING":
 				if room.Phase == "voting" {
 					room.Phase = "selecting_answer"
@@ -384,8 +420,7 @@ func handleHost(room *Room, conn *websocket.Conn) {
 
 			case "CANCEL_QUESTION":
 				if room.Phase == "voting" || room.Phase == "selecting_answer" {
-					if room.CurrentQuestionIndex >= 0 && room.CurrentQuestionIndex < len(room.Questions) {
-						room.Questions = append(room.Questions[:room.CurrentQuestionIndex], room.Questions[room.CurrentQuestionIndex+1:]...)
+					if room.CurrentQuestionIndex >= 0 {
 						room.CurrentQuestionIndex--
 					}
 					room.Phase = "creating_question"

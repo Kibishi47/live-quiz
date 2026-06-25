@@ -144,10 +144,20 @@ export function useQuizHost() {
     }
   }
 
-  const launchVoting = () => {
+  const launchVoting = (questionId?: string) => {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({
-        type: 'LAUNCH_VOTING'
+        type: 'LAUNCH_VOTING',
+        questionId
+      }))
+    }
+  }
+
+  const deleteQuestion = (questionId: string) => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        type: 'DELETE_QUESTION',
+        questionId
       }))
     }
   }
@@ -248,6 +258,7 @@ export function useQuizHost() {
     cancelQuestion,
     kickPlayer,
     leaveRoom,
+    deleteQuestion,
     restartQuiz
   }
 }
