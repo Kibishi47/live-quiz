@@ -30,9 +30,14 @@
           </div>
           <div class="share-info">
             <p>Code de connexion: <strong>{{ roomId }}</strong></p>
-            <button class="btn btn-secondary btn-sm" @click="copyShareLink">
-              {{ copied ? 'Copié !' : 'Copier le lien' }}
-            </button>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+              <button class="btn btn-secondary btn-sm" @click="copyShareLink">
+                {{ copied ? 'Copié !' : 'Copier le lien' }}
+              </button>
+              <button class="btn btn-danger btn-sm" @click="handleLeave">
+                Quitter le salon
+              </button>
+            </div>
           </div>
         </header>
 
@@ -47,15 +52,15 @@
           <div v-if="phase === 'lobby'" class="action-bar">
             <p v-if="questions.length === 0" class="warning-text">Ajoutez votre première question ci-dessous pour démarrer.</p>
             <button v-else class="btn btn-success" @click="launchVoting">
-              Lancer la première question
+              Lancer la question suivante
             </button>
           </div>
 
           <!-- PHASE: CREATING QUESTION -->
           <div v-else-if="phase === 'creating_question'" class="action-bar">
             <p class="warning-text">Remplissez le formulaire ci-dessous pour lancer la prochaine question.</p>
-            <button v-if="questions.length > 0" class="btn btn-success" @click="launchVoting">
-              Lancer la question créée
+            <button v-if="hasUnplayedQuestions" class="btn btn-success" @click="launchVoting">
+              Lancer la question suivante
             </button>
           </div>
 
@@ -69,6 +74,9 @@
             <div class="actions">
               <button class="btn btn-warning" @click="closeVoting">
                 Clore les votes & Choisir la réponse
+              </button>
+              <button class="btn btn-secondary" @click="cancelQuestion">
+                Annuler la question
               </button>
               <button class="btn btn-danger" @click="endGame">
                 Terminer le Quiz
@@ -96,9 +104,12 @@
                 </button>
               </div>
             </div>
-            <div class="actions mt-4" v-if="selectedCorrectIndex !== null">
-              <button class="btn btn-success" @click="confirmCorrectAnswer">
+            <div class="actions mt-4">
+              <button class="btn btn-success" :disabled="selectedCorrectIndex === null" @click="confirmCorrectAnswer" v-if="selectedCorrectIndex !== null">
                 Confirmer la bonne réponse et clore
+              </button>
+              <button class="btn btn-secondary" @click="cancelQuestion">
+                Annuler la question
               </button>
             </div>
           </div>
@@ -109,6 +120,9 @@
               <h3>Réponses révélées. Bonne réponse: <span class="correct-text">{{ currentQuestionCorrectOption }}</span></h3>
             </div>
             <div class="actions">
+              <button v-if="hasUnplayedQuestions" class="btn btn-success" @click="launchVoting">
+                Lancer la question suivante
+              </button>
               <button class="btn btn-primary" @click="prepareNextQuestion">
                 Créer la question suivante
               </button>
@@ -256,7 +270,10 @@
             >
               <div class="player-rank">#{{ idx + 1 }}</div>
               <div class="player-info">
-                <span class="player-name">{{ player.nickname }}</span>
+                <span class="player-name">
+                  <span class="status-indicator" :class="player.connected ? 'online' : 'offline'" :title="player.connected ? 'Actif' : 'Inactif'"></span>
+                  {{ player.nickname }}
+                </span>
                 <span class="player-stats-detail">
                   {{ player.correctCount }} / {{ player.attemptedCount }} correct{{ player.attemptedCount > 1 ? 's' : '' }}
                 </span>
@@ -268,6 +285,14 @@
                 </span>
               </div>
               <div class="player-score">{{ player.score }} pts</div>
+              <button 
+                v-if="player.id !== 'host-self'" 
+                class="btn-kick" 
+                @click="kickPlayer(player.id)" 
+                title="Exclure ce joueur"
+              >
+                🚫
+              </button>
             </div>
             
             <div v-if="players.length === 0" class="no-players">
@@ -294,6 +319,7 @@ const {
   phase,
   players,
   questions,
+  currentQuestion,
   currentQuestionIndex,
   isPeerReady,
   peerError,
@@ -307,8 +333,16 @@ const {
   revealQuestionAnswers,
   submitHostSelfAnswer,
   endGame,
+  cancelQuestion,
+  kickPlayer,
+  leaveRoom,
   restartQuiz
 } = useQuizHost()
+
+const handleLeave = () => {
+  leaveRoom()
+  router.push('/')
+}
 
 // Phase labels mapping
 const phaseLabels = {
@@ -367,10 +401,7 @@ const copyShareLink = () => {
 }
 
 // Computed helper states
-const currentQuestion = computed(() => {
-  if (currentQuestionIndex.value < 0 || currentQuestionIndex.value >= questions.value.length) return null
-  return questions.value[currentQuestionIndex.value]
-})
+
 
 const currentQuestionCorrectOption = computed(() => {
   if (!currentQuestion.value || currentQuestion.value.correctIndex == null) return ''
@@ -379,6 +410,10 @@ const currentQuestionCorrectOption = computed(() => {
 
 const isLastQuestion = computed(() => {
   return currentQuestionIndex.value >= questions.value.length - 1
+})
+
+const hasUnplayedQuestions = computed(() => {
+  return currentQuestionIndex.value + 1 < questions.value.length
 })
 
 const sortedPlayers = computed(() => {
@@ -949,5 +984,42 @@ onMounted(() => {
   gap: 1rem;
   justify-content: space-between;
   align-items: center;
+}
+
+.player-name {
+  display: flex;
+  align-items: center;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.status-indicator.online {
+  background-color: var(--color-success, #10b981);
+  box-shadow: 0 0 8px var(--color-success, #10b981);
+}
+.status-indicator.offline {
+  background-color: var(--color-danger, #ef4444);
+  box-shadow: 0 0 8px var(--color-danger, #ef4444);
+}
+
+.btn-kick {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  margin-left: 0.75rem;
+  font-size: 1.1rem;
+  opacity: 0.5;
+  transition: opacity var(--transition-smooth);
+}
+
+.btn-kick:hover {
+  opacity: 1;
 }
 </style>

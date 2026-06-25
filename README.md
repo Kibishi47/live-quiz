@@ -1,75 +1,47 @@
-# Nuxt Minimal Starter
+# Live Quiz - WebSocket Serverless-Like Mono-Repo
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Ce projet est un système de quiz interactif en temps réel, constitué de deux parties distinctes :
+1. **`web/`** : L'application web interactive développée avec Nuxt 4 (Vue.js).
+2. **`server/`** : Le serveur d'orchestration en Go qui gère la communication WebSocket entre l'hôte et les participants de manière bidirectionnelle.
 
-## Setup
+---
 
-Make sure to install dependencies:
+## Structure du Projet
 
-```bash
-# npm
-npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
+```
+live-quiz/
+├── Dockerfile          # Compile le frontend statique et l'intègre au binaire Go (Déploiement Coolify)
+├── server/             # Serveur WebSocket en Go
+└── web/                # Interface SPA en Nuxt 4
 ```
 
-## Development Server
+---
 
-Start the development server on `http://localhost:3000`:
+## Lancement en Développement Local
 
+Pour faire tourner le projet localement :
+
+### 1. Démarrer le Serveur Go
+Allez dans le dossier `server` et lancez :
 ```bash
-# npm
+go run main.go
+```
+Le serveur WebSocket démarrera sur le port `8080`.
+
+### 2. Démarrer le Frontend Nuxt
+Allez dans le dossier `web` et lancez :
+```bash
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
+L'interface sera accessible sur `http://localhost:3000` (ou `3001` si occupé). Le client détecte automatiquement le mode de développement et se connecte au port `8080`.
 
-## Production
+---
 
-Build the application for production:
+## Déploiement (Coolify / Docker)
 
-```bash
-# npm
-npm run build
+Le projet dispose d'un `Dockerfile` multi-étapes à la racine :
+1. Il compile le frontend Nuxt en mode statique (SPA).
+2. Il compile le binaire Go.
+3. Il intègre le dossier généré directement dans le conteneur final servi par le binaire Go.
 
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Pour déployer sur Coolify, pointez simplement sur la racine du dépôt git.

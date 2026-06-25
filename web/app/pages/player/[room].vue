@@ -33,8 +33,11 @@
             </p>
           </div>
         </div>
-        <div class="room-indicator">
-          Salon: <strong>{{ roomId }}</strong>
+        <div class="room-indicator" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+          <div>Salon: <strong>{{ roomId }}</strong></div>
+          <button class="btn btn-danger btn-sm" @click="handleLeave" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+            Quitter
+          </button>
         </div>
       </header>
 
@@ -237,14 +240,37 @@ const {
   gameState,
   joinRoom,
   submitAnswer,
+  leaveRoom,
   disconnect
 } = useQuizPlayer()
 
+const handleLeave = () => {
+  leaveRoom()
+  router.push('/')
+}
+
 const roomId = ref('')
 const nickname = ref('')
-const hasAnswered = ref(false)
+
+const mePlayerState = computed(() => {
+  return gameState.value?.players.find(p => p.nickname === nickname.value)
+})
+
+const localAnswered = ref(false)
+const hasAnswered = computed(() => {
+  return localAnswered.value || mePlayerState.value?.answered || false
+})
 const selectedOptionIdx = ref(null)
-const mySelectedOptionText = ref('')
+
+const mySelectedOptionText = computed(() => {
+  if (selectedOptionIdx.value !== null && gameState.value?.currentQuestion) {
+    return gameState.value.currentQuestion.options[selectedOptionIdx.value]
+  }
+  if (mePlayerState.value && mePlayerState.value.lastOptionIndex != null && gameState.value?.currentQuestion) {
+    return gameState.value.currentQuestion.options[mePlayerState.value.lastOptionIndex]
+  }
+  return ''
+})
 
 onMounted(() => {
   const room = route.params.room
@@ -267,9 +293,8 @@ const goHome = () => {
 // Reset answer statuses on new questions
 const currentQuestionId = computed(() => gameState.value?.currentQuestion?.id)
 watch(currentQuestionId, () => {
-  hasAnswered.value = false
+  localAnswered.value = false
   selectedOptionIdx.value = null
-  mySelectedOptionText.value = ''
 })
 
 const selectOption = (idx) => {
@@ -278,17 +303,12 @@ const selectOption = (idx) => {
 
 const confirmAnswer = () => {
   if (selectedOptionIdx.value !== null && gameState.value?.currentQuestion) {
-    hasAnswered.value = true
-    mySelectedOptionText.value = gameState.value.currentQuestion.options[selectedOptionIdx.value]
+    localAnswered.value = true
     submitAnswer(gameState.value.currentQuestion.id, selectedOptionIdx.value)
   }
 }
 
 // Player state helpers
-const mePlayerState = computed(() => {
-  return gameState.value?.players.find(p => p.nickname === nickname.value)
-})
-
 const myScore = computed(() => {
   return mePlayerState.value?.score || 0
 })

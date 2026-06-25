@@ -23,7 +23,3 @@ logs
 .env.*
 !.env.example
 
-# Go build outputs
-server/server
-server/server.exe
-
