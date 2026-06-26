@@ -143,6 +143,47 @@
           </div>
         </section>
 
+        <!-- Section: Résumé des Résultats du Tour -->
+        <section v-if="phase === 'revealed'" class="glass-panel results-summary-card mt-4 animate-fade-in">
+          <div class="results-grid">
+            <!-- Liste des vainqueurs -->
+            <div class="winners-section">
+              <h3>🏆 Joueurs ayant bien répondu ({{ winningPlayers.length }})</h3>
+              <div v-if="winningPlayers.length > 0" class="winners-list">
+                <span v-for="p in winningPlayers" :key="p.id" class="winner-pill">
+                  🎉 {{ p.nickname }}
+                </span>
+              </div>
+              <div v-else class="no-winners">
+                <p>😢 Personne n'a trouvé la bonne réponse pour cette question !</p>
+              </div>
+            </div>
+
+            <!-- Distribution des votes -->
+            <div class="votes-section">
+              <h3>📊 Distribution des votes</h3>
+              <div class="votes-chart">
+                <div v-for="vc in voteCounts" :key="vc.index" class="vote-bar-row">
+                  <div class="vote-bar-info">
+                    <span class="option-badge" :class="{ 'is-correct': vc.index === correctOptionIndex }">
+                      {{ vc.letter }}
+                    </span>
+                    <span class="option-text" :class="{ 'is-correct': vc.index === correctOptionIndex }">{{ vc.text }}</span>
+                  </div>
+                  <div class="vote-bar-container">
+                    <div 
+                      class="vote-bar-fill" 
+                      :class="{ 'is-correct': vc.index === correctOptionIndex }"
+                      :style="{ width: getVotePercentage(vc.count) + '%' }"
+                    ></div>
+                    <span class="vote-count">{{ vc.count }} vote{{ vc.count > 1 ? 's' : '' }} ({{ getVotePercentage(vc.count) }}%)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Question Creator (Shown in Lobby or Creating Question phases) -->
         <section v-if="phase === 'lobby' || phase === 'creating_question'" class="glass-panel creator-section mt-4 animate-fade-in">
           <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1.5rem;">
@@ -575,6 +616,7 @@ const {
   chat,
   currentQuestion,
   currentQuestionIndex,
+  correctOptionIndex,
   isPeerReady,
   peerError,
   isHostPlaying,
@@ -868,9 +910,39 @@ const copyShareLink = () => {
 
 
 const currentQuestionCorrectOption = computed(() => {
-  if (!currentQuestion.value || currentQuestion.value.correctIndex == null) return ''
-  return currentQuestion.value.options[currentQuestion.value.correctIndex]
+  if (!currentQuestion.value || correctOptionIndex.value == null) return ''
+  return currentQuestion.value.options[correctOptionIndex.value]
 })
+
+const winningPlayers = computed(() => {
+  return players.value.filter(p => p.lastAnswerCorrect === true)
+})
+
+const voteCounts = computed(() => {
+  if (!currentQuestion.value || !currentQuestion.value.options) return []
+  
+  const counts = currentQuestion.value.options.map((option, idx) => ({
+    index: idx,
+    text: option,
+    letter: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][idx] || '',
+    count: 0
+  }))
+
+  players.value.forEach(p => {
+    if (p.lastOptionIndex !== null && p.lastOptionIndex !== undefined && p.lastOptionIndex >= 0 && p.lastOptionIndex < counts.length) {
+      counts[p.lastOptionIndex].count++
+    }
+  })
+
+  // Sort descending order of votes
+  return counts.sort((a, b) => b.count - a.count)
+})
+
+const getVotePercentage = (count) => {
+  const total = players.value.length
+  if (total === 0) return 0
+  return Math.round((count / total) * 100)
+}
 
 const isLastQuestion = computed(() => {
   return !hasUnplayedQuestions.value

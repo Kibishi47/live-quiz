@@ -51,6 +51,7 @@ export function useQuizHost() {
   const chat = ref<ChatMessage[]>([])
   const currentQuestion = ref<{ id: string; text: string; options: string[] } | null>(null)
   const currentQuestionIndex = ref(-1)
+  const correctOptionIndex = ref<number | null>(null)
   const isPeerReady = ref(false)
   const peerError = ref('')
 
@@ -113,6 +114,7 @@ export function useQuizHost() {
             chat.value = state.chat || []
             currentQuestion.value = state.currentQuestion || null
             currentQuestionIndex.value = state.currentQuestionIndex ?? -1
+            correctOptionIndex.value = state.correctOptionIndex ?? null
           }
         } catch (e) {
           console.error('Error parsing WebSocket message:', e)
@@ -273,6 +275,7 @@ export function useQuizHost() {
     chat,
     currentQuestion,
     currentQuestionIndex,
+    correctOptionIndex,
     isPeerReady,
     peerError,
     isHostPlaying,

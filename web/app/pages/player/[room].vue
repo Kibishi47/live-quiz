@@ -185,6 +185,47 @@
           </div>
         </div>
 
+        <!-- Section: Résumé des Résultats du Tour -->
+        <div class="results-summary-card mt-4">
+          <div class="results-grid-vertical">
+            <!-- Liste des vainqueurs -->
+            <div class="winners-section">
+              <h3>🏆 Joueurs ayant bien répondu ({{ winningPlayers.length }})</h3>
+              <div v-if="winningPlayers.length > 0" class="winners-list">
+                <span v-for="p in winningPlayers" :key="p.id" class="winner-pill">
+                  🎉 {{ p.nickname }}
+                </span>
+              </div>
+              <div v-else class="no-winners">
+                <p>😢 Personne n'a trouvé la bonne réponse !</p>
+              </div>
+            </div>
+
+            <!-- Distribution des votes -->
+            <div class="votes-section mt-4">
+              <h3>📊 Votes</h3>
+              <div class="votes-chart">
+                <div v-for="vc in voteCounts" :key="vc.index" class="vote-bar-row">
+                  <div class="vote-bar-info">
+                    <span class="option-badge" :class="{ 'is-correct': vc.index === gameState.correctOptionIndex }">
+                      {{ vc.letter }}
+                    </span>
+                    <span class="option-text" :class="{ 'is-correct': vc.index === gameState.correctOptionIndex }">{{ vc.text }}</span>
+                  </div>
+                  <div class="vote-bar-container">
+                    <div 
+                      class="vote-bar-fill" 
+                      :class="{ 'is-correct': vc.index === gameState.correctOptionIndex }"
+                      :style="{ width: getVotePercentage(vc.count) + '%' }"
+                    ></div>
+                    <span class="vote-count">{{ vc.count }} vote{{ vc.count > 1 ? 's' : '' }} ({{ getVotePercentage(vc.count) }}%)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="leaderboard-preview mt-4">
           <h3>Classement en direct</h3>
           <div class="preview-rows">
@@ -522,6 +563,39 @@ const correctOptionText = computed(() => {
   if (!gameState.value || !gameState.value.currentQuestion || gameState.value.correctOptionIndex == null) return ''
   return gameState.value.currentQuestion.options[gameState.value.correctOptionIndex]
 })
+
+const winningPlayers = computed(() => {
+  const playersList = gameState.value?.players || []
+  return playersList.filter(p => p.lastAnswerCorrect === true)
+})
+
+const voteCounts = computed(() => {
+  const options = gameState.value?.currentQuestion?.options
+  if (!options) return []
+  
+  const counts = options.map((option, idx) => ({
+    index: idx,
+    text: option,
+    letter: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][idx] || '',
+    count: 0
+  }))
+
+  const playersList = gameState.value?.players || []
+  playersList.forEach(p => {
+    if (p.lastOptionIndex !== null && p.lastOptionIndex !== undefined && p.lastOptionIndex >= 0 && p.lastOptionIndex < counts.length) {
+      counts[p.lastOptionIndex].count++
+    }
+  })
+
+  // Sort descending order of votes
+  return counts.sort((a, b) => b.count - a.count)
+})
+
+const getVotePercentage = (count) => {
+  const total = gameState.value?.players?.length || 0
+  if (total === 0) return 0
+  return Math.round((count / total) * 100)
+}
 
 const sortedPlayers = computed(() => {
   return [...(gameState.value?.players || [])].sort((a, b) => b.score - a.score)
