@@ -379,7 +379,35 @@
                   {{ player.lastAnswerCorrect ? '✨ Correct (+100)' : '❌ Faux / Pas répondu' }}
                 </span>
               </div>
-              <div class="player-score">{{ player.score }} pts</div>
+              <div class="player-score-container" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; margin-right: 0.5rem;">
+                <div class="player-score" style="font-weight: 700;">{{ player.score }} pts</div>
+                <div class="score-adjust-buttons" style="display: flex; gap: 0.15rem;">
+                  <button 
+                    class="btn-adjust btn-adjust-plus" 
+                    style="padding: 0.1rem 0.3rem; font-size: 0.65rem; border-radius: 4px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #a7f3d0; cursor: pointer; font-weight: bold;"
+                    @click="adjustPlayerScore(player.id, 100)"
+                    title="Ajouter 100 points"
+                  >
+                    +100
+                  </button>
+                  <button 
+                    class="btn-adjust btn-adjust-plus" 
+                    style="padding: 0.1rem 0.3rem; font-size: 0.65rem; border-radius: 4px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #a7f3d0; cursor: pointer; font-weight: bold;"
+                    @click="adjustPlayerScore(player.id, 50)"
+                    title="Ajouter 50 points"
+                  >
+                    +50
+                  </button>
+                  <button 
+                    class="btn-adjust btn-adjust-minus" 
+                    style="padding: 0.1rem 0.3rem; font-size: 0.65rem; border-radius: 4px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; cursor: pointer; font-weight: bold;"
+                    @click="adjustPlayerScore(player.id, -50)"
+                    title="Retirer 50 points"
+                  >
+                    -50
+                  </button>
+                </div>
+              </div>
               <button 
                 v-if="player.id !== 'host-self'" 
                 class="btn-kick" 
@@ -641,7 +669,8 @@ const {
   leaveRoom,
   deleteQuestion,
   restartQuiz,
-  sendChatMessage
+  sendChatMessage,
+  adjustPlayerScore
 } = useQuizHost()
 
 const showChatDrawer = ref(false)

@@ -693,6 +693,24 @@ func handleHost(room *Room, conn *websocket.Conn) {
 				}
 				room.BroadcastState()
 
+			case "ADJUST_SCORE":
+				playerID, _ := cmd["playerId"].(string)
+				amountVal, ok := cmd["amount"].(float64)
+				if !ok || playerID == "" {
+					continue
+				}
+				amount := int(amountVal)
+
+				room.PlayersMu.Lock()
+				if p, exists := room.PlayersData[playerID]; exists {
+					p.Score += amount
+					if p.Score < 0 {
+						p.Score = 0
+					}
+				}
+				room.PlayersMu.Unlock()
+				room.BroadcastState()
+
 			case "SEND_CHAT_MESSAGE":
 				text, _ := cmd["text"].(string)
 				if text == "" {

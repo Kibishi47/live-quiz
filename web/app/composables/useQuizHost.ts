@@ -271,6 +271,16 @@ export function useQuizHost() {
     }
   }
 
+  const adjustPlayerScore = (playerId: string, amount: number) => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        type: 'ADJUST_SCORE',
+        playerId,
+        amount
+      }))
+    }
+  }
+
   onBeforeUnmount(() => {
     if (ws.value) {
       ws.value.close()
@@ -306,6 +316,7 @@ export function useQuizHost() {
     leaveRoom,
     deleteQuestion,
     restartQuiz,
-    sendChatMessage
+    sendChatMessage,
+    adjustPlayerScore
   }
 }
