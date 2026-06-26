@@ -326,3 +326,94 @@ body {
   color: var(--text-primary);
 }
 
+/* Shared Leaderboard and Connection Status styles */
+.player-row {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  transition: var(--transition-smooth);
+}
+
+.player-row.is-self {
+  border-color: rgba(236, 72, 153, 0.4);
+  background: rgba(236, 72, 153, 0.03);
+}
+
+.player-row.has-answered {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.player-row.correct-answer {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.player-row.wrong-answer {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.player-rank {
+  font-weight: 700;
+  width: 2.5rem;
+  color: var(--text-muted);
+}
+
+.player-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.player-name {
+  display: flex;
+  align-items: center;
+}
+
+.player-stats-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.player-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.player-status-reveal {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.player-row.correct-answer .player-status-reveal { color: var(--color-success); }
+.player-row.wrong-answer .player-status-reveal { color: var(--color-danger); }
+
+.player-score {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.status-indicator.online {
+  background-color: var(--color-success, #10b981);
+  box-shadow: 0 0 8px var(--color-success, #10b981);
+}
+
+.status-indicator.offline {
+  background-color: var(--color-danger, #ef4444);
+  box-shadow: 0 0 8px var(--color-danger, #ef4444);
+}
+
+

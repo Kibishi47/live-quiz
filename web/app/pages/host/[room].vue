@@ -87,26 +87,30 @@
           <!-- PHASE: SELECTING ANSWER -->
           <div v-else-if="phase === 'selecting_answer'" class="action-bar">
             <div class="current-q-preview">
-              <span class="label">Sélection de la bonne réponse:</span>
+              <span class="label">Sélection de la bonne réponse :</span>
               <h3>{{ currentQuestion?.text }}</h3>
             </div>
             <div class="validation-panel mt-2">
-              <p><strong>Cliquez sur la bonne réponse ci-dessous :</strong></p>
+              <p><strong>Choisissez une ou plusieurs bonnes réponses ci-dessous :</strong></p>
               <div class="validation-options mt-2">
                 <button 
                   v-for="(option, idx) in currentQuestion?.options" 
                   :key="idx" 
                   class="btn option-val-btn"
-                  :class="selectedCorrectIndex === idx ? 'btn-success' : 'btn-secondary'"
+                  :class="selectedCorrectIndices.includes(idx) ? 'btn-success' : 'btn-secondary'"
                   @click="selectCorrectAnswer(idx)"
                 >
+                  <span style="margin-right: 0.5rem; font-family: monospace;">{{ selectedCorrectIndices.includes(idx) ? '☑' : '☐' }}</span>
                   {{ ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][idx] }}. {{ option }}
                 </button>
               </div>
             </div>
-            <div class="actions mt-4">
-              <button class="btn btn-success" :disabled="selectedCorrectIndex === null" @click="confirmCorrectAnswer" v-if="selectedCorrectIndex !== null">
-                Confirmer la bonne réponse et clore
+            <div class="actions mt-4" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn btn-success" :disabled="selectedCorrectIndices.length === 0" @click="confirmCorrectAnswer">
+                Confirmer la/les réponse(s) et clore
+              </button>
+              <button class="btn btn-primary" @click="selectMostVotedOptionAndConfirm">
+                🏆 Valider l'option la plus votée
               </button>
               <button class="btn btn-secondary" @click="cancelQuestion">
                 Annuler la question
@@ -165,15 +169,15 @@
               <div class="votes-chart">
                 <div v-for="vc in voteCounts" :key="vc.index" class="vote-bar-row">
                   <div class="vote-bar-info">
-                    <span class="option-badge" :class="{ 'is-correct': vc.index === correctOptionIndex }">
+                    <span class="option-badge" :class="{ 'is-correct': correctOptionIndices && correctOptionIndices.includes(vc.index) }">
                       {{ vc.letter }}
                     </span>
-                    <span class="option-text" :class="{ 'is-correct': vc.index === correctOptionIndex }">{{ vc.text }}</span>
+                    <span class="option-text" :class="{ 'is-correct': correctOptionIndices && correctOptionIndices.includes(vc.index) }">{{ vc.text }}</span>
                   </div>
                   <div class="vote-bar-container">
                     <div 
                       class="vote-bar-fill" 
-                      :class="{ 'is-correct': vc.index === correctOptionIndex }"
+                      :class="{ 'is-correct': correctOptionIndices && correctOptionIndices.includes(vc.index) }"
                       :style="{ width: getVotePercentage(vc.count) + '%' }"
                     ></div>
                     <span class="vote-count">{{ vc.count }} vote{{ vc.count > 1 ? 's' : '' }} ({{ getVotePercentage(vc.count) }}%)</span>
@@ -617,6 +621,7 @@ const {
   currentQuestion,
   currentQuestionIndex,
   correctOptionIndex,
+  correctOptionIndices,
   isPeerReady,
   peerError,
   isHostPlaying,
@@ -628,6 +633,7 @@ const {
   launchVoting,
   closeVoting,
   revealQuestionAnswers,
+  revealMostVotedAnswer,
   submitHostSelfAnswer,
   endGame,
   cancelQuestion,
@@ -910,8 +916,8 @@ const copyShareLink = () => {
 
 
 const currentQuestionCorrectOption = computed(() => {
-  if (!currentQuestion.value || correctOptionIndex.value == null) return ''
-  return currentQuestion.value.options[correctOptionIndex.value]
+  if (!currentQuestion.value || !correctOptionIndices.value || correctOptionIndices.value.length === 0) return ''
+  return correctOptionIndices.value.map(idx => currentQuestion.value.options[idx]).join(', ')
 })
 
 const winningPlayers = computed(() => {
@@ -991,15 +997,25 @@ const confirmHostAnswer = () => {
 }
 
 // Correct Answer Validation States
-const selectedCorrectIndex = ref(null)
+const selectedCorrectIndices = ref([])
 const selectCorrectAnswer = (idx) => {
-  selectedCorrectIndex.value = idx
+  const foundIdx = selectedCorrectIndices.value.indexOf(idx)
+  if (foundIdx > -1) {
+    selectedCorrectIndices.value.splice(foundIdx, 1)
+  } else {
+    selectedCorrectIndices.value.push(idx)
+  }
 }
 const confirmCorrectAnswer = () => {
-  if (selectedCorrectIndex.value !== null) {
-    revealQuestionAnswers(selectedCorrectIndex.value)
-    selectedCorrectIndex.value = null
+  if (selectedCorrectIndices.value.length > 0) {
+    revealQuestionAnswers(selectedCorrectIndices.value)
+    selectedCorrectIndices.value = []
   }
+}
+
+const selectMostVotedOptionAndConfirm = () => {
+  revealMostVotedAnswer()
+  selectedCorrectIndices.value = []
 }
 
 const goHome = () => {

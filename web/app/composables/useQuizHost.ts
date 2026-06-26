@@ -52,6 +52,7 @@ export function useQuizHost() {
   const currentQuestion = ref<{ id: string; text: string; options: string[] } | null>(null)
   const currentQuestionIndex = ref(-1)
   const correctOptionIndex = ref<number | null>(null)
+  const correctOptionIndices = ref<number[]>([])
   const isPeerReady = ref(false)
   const peerError = ref('')
 
@@ -115,6 +116,7 @@ export function useQuizHost() {
             currentQuestion.value = state.currentQuestion || null
             currentQuestionIndex.value = state.currentQuestionIndex ?? -1
             correctOptionIndex.value = state.correctOptionIndex ?? null
+            correctOptionIndices.value = state.correctOptionIndices || []
           }
         } catch (e) {
           console.error('Error parsing WebSocket message:', e)
@@ -181,11 +183,19 @@ export function useQuizHost() {
     }
   }
 
-  const revealQuestionAnswers = (correctIndex: number) => {
+  const revealQuestionAnswers = (correctIndices: number[]) => {
     if (ws.value && ws.value.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({
         type: 'REVEAL_ANSWER',
-        correctIndex
+        correctIndices
+      }))
+    }
+  }
+
+  const revealMostVotedAnswer = () => {
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        type: 'REVEAL_MOST_VOTED'
       }))
     }
   }
@@ -276,6 +286,7 @@ export function useQuizHost() {
     currentQuestion,
     currentQuestionIndex,
     correctOptionIndex,
+    correctOptionIndices,
     isPeerReady,
     peerError,
     isHostPlaying,
@@ -287,6 +298,7 @@ export function useQuizHost() {
     launchVoting,
     closeVoting,
     revealQuestionAnswers,
+    revealMostVotedAnswer,
     submitHostSelfAnswer,
     endGame,
     cancelQuestion,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"sync"
@@ -34,10 +35,11 @@ type Player struct {
 }
 
 type Question struct {
-	ID           string   `json:"id"`
-	Text         string   `json:"text"`
-	Options      []string `json:"options"`
-	CorrectIndex *int     `json:"correctIndex"`
+	ID             string   `json:"id"`
+	Text           string   `json:"text"`
+	Options        []string `json:"options"`
+	CorrectIndex   *int     `json:"correctIndex"`
+	CorrectIndices []int    `json:"correctIndices"`
 }
 
 type PlayerQuestion struct {
@@ -53,13 +55,14 @@ type ChatMessage struct {
 }
 
 type GameState struct {
-	RoomID             string          `json:"roomId"`
-	Phase              string          `json:"phase"`
-	Players            []Player        `json:"players"`
-	CurrentQuestion    *PlayerQuestion `json:"currentQuestion"`
-	RevealAnswers      bool            `json:"revealAnswers"`
-	CorrectOptionIndex *int            `json:"correctOptionIndex"`
-	Chat               []ChatMessage   `json:"chat"`
+	RoomID               string          `json:"roomId"`
+	Phase                string          `json:"phase"`
+	Players              []Player        `json:"players"`
+	CurrentQuestion      *PlayerQuestion `json:"currentQuestion"`
+	RevealAnswers        bool            `json:"revealAnswers"`
+	CorrectOptionIndex   *int            `json:"correctOptionIndex"`
+	CorrectOptionIndices []int           `json:"correctOptionIndices"`
+	Chat                 []ChatMessage   `json:"chat"`
 }
 
 type PlayerConn struct {
@@ -104,6 +107,7 @@ func (r *Room) BroadcastState() {
 
 	var currentQ *PlayerQuestion
 	var correctIdx *int
+	var correctOptionIndices []int
 
 	if r.CurrentQuestionIndex >= 0 && r.CurrentQuestionIndex < len(r.Questions) {
 		q := r.Questions[r.CurrentQuestionIndex]
@@ -114,6 +118,7 @@ func (r *Room) BroadcastState() {
 		}
 		if r.Phase == "revealed" {
 			correctIdx = q.CorrectIndex
+			correctOptionIndices = q.CorrectIndices
 		}
 	}
 
@@ -144,13 +149,14 @@ func (r *Room) BroadcastState() {
 	}
 
 	state := GameState{
-		RoomID:             r.ID,
-		Phase:              r.Phase,
-		Players:            playersList,
-		CurrentQuestion:    currentQ,
-		RevealAnswers:      r.Phase == "revealed",
-		CorrectOptionIndex: correctIdx,
-		Chat:               r.Chat,
+		RoomID:               r.ID,
+		Phase:                r.Phase,
+		Players:              playersList,
+		CurrentQuestion:      currentQ,
+		RevealAnswers:        r.Phase == "revealed",
+		CorrectOptionIndex:   correctIdx,
+		CorrectOptionIndices: correctOptionIndices,
+		Chat:                 r.Chat,
 	}
 
 	payloadPlayer, err := json.Marshal(map[string]interface{}{
@@ -165,14 +171,15 @@ func (r *Room) BroadcastState() {
 	payloadHost, err := json.Marshal(map[string]interface{}{
 		"type": "STATE_UPDATE",
 		"state": map[string]interface{}{
-			"roomId":             r.ID,
-			"phase":              r.Phase,
-			"players":            playersList,
-			"currentQuestion":    currentQ,
-			"revealAnswers":      r.Phase == "revealed",
-			"correctOptionIndex": correctIdx,
-			"questions":          r.Questions,
-			"chat":               r.Chat,
+			"roomId":               r.ID,
+			"phase":                r.Phase,
+			"players":              playersList,
+			"currentQuestion":      currentQ,
+			"revealAnswers":        r.Phase == "revealed",
+			"correctOptionIndex":   correctIdx,
+			"correctOptionIndices": correctOptionIndices,
+			"questions":            r.Questions,
+			"chat":                 r.Chat,
 		},
 	})
 	if err != nil {
@@ -476,17 +483,36 @@ func handleHost(room *Room, conn *websocket.Conn) {
 				}
 
 			case "REVEAL_ANSWER":
-				correctIdxVal, ok := cmd["correctIndex"].(float64)
-				if !ok {
+				var correctIndices []int
+				if indicesVal, exists := cmd["correctIndices"]; exists {
+					if list, ok := indicesVal.([]interface{}); ok {
+						for _, item := range list {
+							if val, ok := item.(float64); ok {
+								correctIndices = append(correctIndices, int(val))
+							}
+						}
+					}
+				} else if idxVal, ok := cmd["correctIndex"].(float64); ok {
+					correctIndices = []int{int(idxVal)}
+				}
+
+				if len(correctIndices) == 0 {
 					continue
 				}
-				correctIndex := int(correctIdxVal)
-				
+
 				if room.Phase == "selecting_answer" || room.Phase == "voting" {
 					if room.CurrentQuestionIndex >= 0 && room.CurrentQuestionIndex < len(room.Questions) {
-						room.Questions[room.CurrentQuestionIndex].CorrectIndex = &correctIndex
+						room.Questions[room.CurrentQuestionIndex].CorrectIndices = correctIndices
+						firstIdx := correctIndices[0]
+						room.Questions[room.CurrentQuestionIndex].CorrectIndex = &firstIdx
 					}
 					room.Phase = "revealed"
+
+					pointsPerCorrect := 100
+					if len(correctIndices) > 1 {
+						rawPoints := float64(100) / float64(len(correctIndices))
+						pointsPerCorrect = int(math.Ceil(rawPoints / 10.0) * 10.0)
+					}
 
 					// Validate player answers and increment stats
 					for _, p := range room.PlayersData {
@@ -496,11 +522,19 @@ func handleHost(room *Room, conn *websocket.Conn) {
 
 						if p.Answered {
 							p.AttemptedCount += 1
-							isCorrect := p.LastOptionIndex != nil && *p.LastOptionIndex == correctIndex
+							isCorrect := false
+							if p.LastOptionIndex != nil {
+								for _, cIdx := range correctIndices {
+									if *p.LastOptionIndex == cIdx {
+										isCorrect = true
+										break
+									}
+								}
+							}
 							p.LastAnswerCorrect = &isCorrect
 							if isCorrect {
 								p.CorrectCount += 1
-								p.Score += 100
+								p.Score += pointsPerCorrect
 							}
 						} else {
 							p.AttemptedCount += 1
@@ -509,6 +543,81 @@ func handleHost(room *Room, conn *websocket.Conn) {
 						}
 					}
 					room.BroadcastState()
+				}
+
+			case "REVEAL_MOST_VOTED":
+				if room.Phase == "selecting_answer" || room.Phase == "voting" {
+					if room.CurrentQuestionIndex >= 0 && room.CurrentQuestionIndex < len(room.Questions) {
+						q := room.Questions[room.CurrentQuestionIndex]
+						
+						counts := make([]int, len(q.Options))
+						for _, p := range room.PlayersData {
+							if p.LastOptionIndex != nil && *p.LastOptionIndex >= 0 && *p.LastOptionIndex < len(counts) {
+								counts[*p.LastOptionIndex]++
+							}
+						}
+						
+						maxVal := 0
+						for _, c := range counts {
+							if c > maxVal {
+								maxVal = c
+							}
+						}
+						
+						var correctIndices []int
+						if maxVal > 0 {
+							for idx, c := range counts {
+								if c == maxVal {
+									correctIndices = append(correctIndices, idx)
+								}
+							}
+						}
+						
+						if len(correctIndices) == 0 {
+							correctIndices = []int{0}
+						}
+
+						room.Questions[room.CurrentQuestionIndex].CorrectIndices = correctIndices
+						firstIdx := correctIndices[0]
+						room.Questions[room.CurrentQuestionIndex].CorrectIndex = &firstIdx
+						
+						room.Phase = "revealed"
+
+						pointsPerCorrect := 100
+						if len(correctIndices) > 1 {
+							rawPoints := float64(100) / float64(len(correctIndices))
+							pointsPerCorrect = int(math.Ceil(rawPoints / 10.0) * 10.0)
+						}
+
+						for _, p := range room.PlayersData {
+							if room.CurrentQuestionIndex < p.JoinQuestionIndex {
+								continue
+							}
+
+							if p.Answered {
+								p.AttemptedCount += 1
+								isCorrect := false
+								if p.LastOptionIndex != nil {
+									for _, cIdx := range correctIndices {
+										if *p.LastOptionIndex == cIdx {
+											isCorrect = true
+											break
+										}
+									}
+								}
+								p.LastAnswerCorrect = &isCorrect
+								if isCorrect {
+									p.CorrectCount += 1
+									p.Score += pointsPerCorrect
+								}
+							} else {
+								p.AttemptedCount += 1
+								isCorrect := false
+								p.LastAnswerCorrect = &isCorrect
+							}
+						}
+						room.BroadcastState()
+					}
 				}
 
 			case "SUBMIT_ANSWER": // Host playing and submits their vote

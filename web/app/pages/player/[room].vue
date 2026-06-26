@@ -1,5 +1,5 @@
 <template>
-  <div class="player-layout">
+  <div class="player-layout" :class="{ 'has-sidebar': isConnected && gameState && nickname }">
     <!-- Nickname Prompt State -->
     <div v-if="!nickname" class="setup-container animate-fade-in">
       <div class="glass-panel status-card">
@@ -47,7 +47,8 @@
 
     <!-- Active Player Workspace -->
     <div v-else-if="isConnected && gameState" class="game-container animate-fade-in">
-      <!-- Player Status Header -->
+      <div class="game-main-content">
+        <!-- Player Status Header -->
       <header class="glass-panel status-header">
         <div class="player-profile">
           <span class="avatar">👤</span>
@@ -207,38 +208,21 @@
               <div class="votes-chart">
                 <div v-for="vc in voteCounts" :key="vc.index" class="vote-bar-row">
                   <div class="vote-bar-info">
-                    <span class="option-badge" :class="{ 'is-correct': vc.index === gameState.correctOptionIndex }">
+                    <span class="option-badge" :class="{ 'is-correct': gameState.correctOptionIndices && gameState.correctOptionIndices.includes(vc.index) }">
                       {{ vc.letter }}
                     </span>
-                    <span class="option-text" :class="{ 'is-correct': vc.index === gameState.correctOptionIndex }">{{ vc.text }}</span>
+                    <span class="option-text" :class="{ 'is-correct': gameState.correctOptionIndices && gameState.correctOptionIndices.includes(vc.index) }">{{ vc.text }}</span>
                   </div>
                   <div class="vote-bar-container">
                     <div 
                       class="vote-bar-fill" 
-                      :class="{ 'is-correct': vc.index === gameState.correctOptionIndex }"
+                      :class="{ 'is-correct': gameState.correctOptionIndices && gameState.correctOptionIndices.includes(vc.index) }"
                       :style="{ width: getVotePercentage(vc.count) + '%' }"
                     ></div>
                     <span class="vote-count">{{ vc.count }} vote{{ vc.count > 1 ? 's' : '' }} ({{ getVotePercentage(vc.count) }}%)</span>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="leaderboard-preview mt-4">
-          <h3>Classement en direct</h3>
-          <div class="preview-rows">
-            <div 
-              v-for="(player, idx) in sortedPlayers" 
-              :key="player.id" 
-              class="preview-row"
-              :class="{'is-me': player.nickname === nickname}"
-            >
-              <span class="rank">#{{ idx + 1 }}</span>
-              <span class="name">{{ player.nickname }}</span>
-              <span class="score-details">{{ player.correctCount }} / {{ player.attemptedCount }} correct(s)</span>
-              <span class="score">{{ player.score }} pts</span>
             </div>
           </div>
         </div>
@@ -273,22 +257,51 @@
           </div>
         </div>
 
-        <div class="final-leaderboard mt-4">
-          <div 
-            v-for="(player, idx) in sortedPlayers" 
-            :key="player.id" 
-            class="final-row"
-            :class="{'is-me': player.nickname === nickname}"
-          >
-            <span class="rank">#{{ idx + 1 }}</span>
-            <span class="name">{{ player.nickname }}</span>
-            <span class="score-details">{{ player.correctCount }} / {{ player.attemptedCount }} correct(s)</span>
-            <span class="score">{{ player.score }} pts</span>
-          </div>
-        </div>
-
         <button class="btn btn-primary mt-4" @click="goHome">Retour à l'accueil</button>
       </main>
+      </div> <!-- Closes game-main-content -->
+
+      <!-- Persistent Sidebar Leaderboard -->
+      <aside class="game-sidebar animate-fade-in">
+        <div class="glass-panel players-card">
+          <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
+            <h2 style="margin: 0; font-size: 1.25rem; font-weight: 600;">Classement Général</h2>
+            <span class="player-count" style="font-size: 0.95rem; font-weight: 600; color: var(--text-muted);">{{ gameState.players.length }} 👥</span>
+          </div>
+
+          <div class="players-list" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 70vh; overflow-y: auto;">
+            <div 
+              v-for="(player, idx) in sortedPlayers" 
+              :key="player.id" 
+              class="player-row"
+              :class="{
+                'is-self': player.nickname === nickname,
+                'has-answered': player.answered && gameState.phase === 'voting',
+                'correct-answer': gameState.phase === 'revealed' && player.lastAnswerCorrect,
+                'wrong-answer': gameState.phase === 'revealed' && player.lastAnswerCorrect === false
+              }"
+            >
+              <div class="player-rank">#{{ idx + 1 }}</div>
+              <div class="player-info">
+                <span class="player-name">
+                  <span class="status-indicator" :class="player.connected ? 'online' : 'offline'" :title="player.connected ? 'Actif' : 'Inactif'"></span>
+                  {{ player.nickname }}
+                </span>
+                <span class="player-stats-detail">
+                  {{ player.correctCount }} / {{ player.attemptedCount }} correct(s)
+                </span>
+                <span class="player-status" v-if="gameState.phase === 'voting'">
+                  {{ player.answered ? '✅ Répondu' : '⏳ En attente...' }}
+                </span>
+                <span class="player-status-reveal" v-if="gameState.phase === 'revealed'">
+                  {{ player.lastAnswerCorrect ? '✨ Correct (+100)' : '❌ Faux / Pas répondu' }}
+                </span>
+              </div>
+              <div class="player-score">{{ player.score }} pts</div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -560,8 +573,8 @@ const isLateJoiner = computed(() => {
 })
 
 const correctOptionText = computed(() => {
-  if (!gameState.value || !gameState.value.currentQuestion || gameState.value.correctOptionIndex == null) return ''
-  return gameState.value.currentQuestion.options[gameState.value.correctOptionIndex]
+  if (!gameState.value || !gameState.value.currentQuestion || !gameState.value.correctOptionIndices || gameState.value.correctOptionIndices.length === 0) return ''
+  return gameState.value.correctOptionIndices.map(idx => gameState.value.currentQuestion.options[idx]).join(', ')
 })
 
 const winningPlayers = computed(() => {
@@ -608,6 +621,46 @@ const sortedPlayers = computed(() => {
   padding: 2rem;
   max-width: 600px;
   margin: 0 auto;
+  transition: max-width 0.3s ease;
+}
+
+.player-layout.has-sidebar {
+  max-width: 600px;
+}
+
+@media (min-width: 1024px) {
+  .player-layout.has-sidebar {
+    max-width: 1100px;
+  }
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .game-container {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    align-items: start;
+  }
+}
+
+.game-main-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.game-sidebar {
+  width: 100%;
+}
+
+.game-sidebar .players-card {
+  padding: 1.5rem;
+  width: 100%;
 }
 
 .setup-container {
